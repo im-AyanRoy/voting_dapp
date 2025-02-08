@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voting DApp</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.5/dist/web3.min.js"></script>
+</head>
+<body>
+    <h1>Decentralized Voting DApp</h1>
+    <p>Connected Account: <span id="account"></span></p>
+
+    <h2>Candidates</h2>
+    <ul id="candidates-list"></ul>
+
+    <h2>Vote for a Candidate</h2>
+    <input type="number" id="candidate-id" placeholder="Enter Candidate ID">
+    <button onclick="vote()">Vote</button>
+
+    <p id="status"></p>
+
+    <script>
+        let web3;
+        let account;
+
+        // Connect to MetaMask
+        async function connectWallet() {
+            if (window.ethereum) {
+                web3 = new Web3(window.ethereum);
+                await window.ethereum.request({ method: "eth_requestAccounts" });
+                const accounts = await web3.eth.getAccounts();
+                account = accounts[0];
+                document.getElementById("account").innerText = account;
+            } else {
+                alert("Please install MetaMask!");
+            }
+        }
+
+        // Fetch candidates from Django backend
+        async function fetchCandidates() {
+            const response = await fetch("/get_candidates/");
+            const data = await response.json();
+            const list = document.getElementById("candidates-list");
+            list.innerHTML = "";
+
+            data.candidates.forEach(candidate => {
+                let item = document.createElement("li");
+                item.innerText = `ID: ${candidate.id} | Name: ${candidate.name} | Votes: ${candidate.votes}`;
+                list.appendChild(item);
+            });
+        }
+
+        // Vote for a candidate
+        async function vote() {
+            const candidateId = document.getElementById("candidate-id").value;
+
+            if (!candidateId) {
+                alert("Please enter a candidate ID!");
+                return;
+            }
+
+            const response = await fetch("/vote/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: `candidate_id=${candidateId}&voter_address=${account}`,
+            });
+
+            const result = await response.json();
+            if (result.status === "success") {
+                document.getElementById("status").innerText = "Vote successful! Transaction: " + result.tx_hash;
+                fetchCandidates();
+            } else {
+                document.getElementById("status").innerText = "Vote failed!";
+            }
+        }
+
+        window.onload = async () => {
+            await connectWallet();
+            await fetchCandidates();
+        };
+    </script>
+</body>
+</html>
